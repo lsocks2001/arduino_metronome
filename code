@@ -1,0 +1,114 @@
+//dj switch
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define OLED_RESET 4
+Adafruit_SSD1306 display(OLED_RESET);
+unsigned long previousMillis = 0;  // will store last time LED was updated
+int interval = 750;  // interval at which to blink (milliseconds)
+int speaker = 4;
+int bpm = 120;
+int minusPin = 6;
+int plusPin = 3;
+int powerSwitchPin = 2;
+int buttonMinus = 0;
+int buttonPlus = 0;
+int beat = 0;
+unsigned long beatInterval = 0;
+
+unsigned long debounceDelay = 50; // Debounce delay in milliseconds
+unsigned long minusButtonLastPressed = 0;
+unsigned long plusButtonLastPressed = 0;
+bool minusButtonPressed = false;
+bool plusButtonPressed = false;
+bool powerSwitchOn = false;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(speaker, OUTPUT);
+  pinMode(minusPin, INPUT_PULLUP);
+  pinMode(plusPin, INPUT_PULLUP);
+  pinMode(powerSwitchPin, INPUT_PULLUP);
+  
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+  display.display();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(4);
+  updateDisplay();
+}
+
+void loop() {
+  buttonMinus = digitalRead(minusPin);
+  buttonPlus = digitalRead(plusPin);
+  Serial.println(bpm);
+
+  bool powerSwitch = digitalRead(powerSwitchPin) == LOW;
+  if (powerSwitch != powerSwitchOn) {
+    powerSwitchOn = powerSwitch;
+    updateDisplay();
+  }
+  
+
+  unsigned long currentMillis = millis();
+  unsigned long beatInterval = 60000 / bpm;
+  if (currentMillis - previousMillis >= beatInterval) {
+    if (beat < 3) {
+      if (powerSwitchOn) {
+        tone(speaker, 262, 100);
+      }
+      
+      beat = beat + 1;
+      previousMillis = currentMillis; }
+    else {
+      if (powerSwitchOn) {
+        tone(speaker, 392, 100);
+      }
+      beat = 0;
+      previousMillis = currentMillis;
+  
+  }
+  }
+  //Minus Button Debounce
+  if (buttonMinus == LOW && !minusButtonPressed && (currentMillis - minusButtonLastPressed >= debounceDelay)) {
+    minusButtonPressed = true;
+    minusButtonLastPressed = currentMillis;
+    bpm = bpm - 2;
+    calculateBeatInterval();
+    updateDisplay();
+    if (bpm < 20) {
+      bpm = 20; // Limit the minimum BPM value
+    }
+  } else if (buttonMinus == HIGH) {
+    minusButtonPressed = false;
+  }
+
+  // Plus Button Debounce
+  if (buttonPlus == LOW && !plusButtonPressed && (currentMillis - plusButtonLastPressed >= debounceDelay)) {
+    plusButtonPressed = true;
+    plusButtonLastPressed = currentMillis;
+    bpm = bpm + 2;
+    calculateBeatInterval();
+    updateDisplay();
+    if (bpm > 300) {
+      bpm = 300; // Limit the maximum BPM value
+    }
+  } else if (buttonPlus == HIGH) {
+    plusButtonPressed = false;
+  }
+}
+
+void calculateBeatInterval() {
+  beatInterval = 60000 / bpm;
+}
+
+void updateDisplay() {
+  display.clearDisplay();
+  display.setCursor(30, 0);
+if (powerSwitchOn) {
+    display.print(bpm);
+  }
+  display.display();
+}
